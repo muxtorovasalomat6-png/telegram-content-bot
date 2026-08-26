@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 client = genai.Client(api_key=config.GEMINI_API_KEY)
 
-TEXT_MODEL = "gemini-2.5-flash"
-IMAGE_MODEL = "gemini-2.5-flash-image"
+TEXT_MODEL = "gemini-3.6-flash"
+IMAGE_MODEL = "gemini-3.1-flash-image"
 
 # auto_topic=False va fixed_topic ham berilmagan hollarda ishlatiladigan zaxira mavzular
 FALLBACK_TOPICS = [
