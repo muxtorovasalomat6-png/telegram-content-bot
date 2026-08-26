@@ -1,10 +1,11 @@
 import asyncio
 import logging
 
-from aiogram import Bot
+from aiogram import Bot, Dispatcher
 
 from src import config
 from src.scheduler import start_scheduler
+from src.handlers import router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,17 +18,19 @@ async def main():
     config.validate_config()
 
     bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
+    dp = Dispatcher()
+    dp.include_router(router)
 
     me = await bot.get_me()
     logger.info(f"Bot ishga tushdi: @{me.username}")
 
-    # MUHIM: bu botda hech qanday xabar handler'i yo'q — u foydalanuvchi
-    # yozgan xabarlarga umuman javob bermaydi. Faqat scheduler orqali,
-    # o'zi belgilagan tasodifiy vaqtlarda kanal/guruhga post yuboradi.
+    # Postlarni fon rejimida yuboruvchi scheduler
     start_scheduler(bot)
 
-    # Dastur doim ishlab tursin (scheduler background'da postlarni yuboraveradi)
-    await asyncio.Event().wait()
+    # Faqat bot egasi bilan /start orqali muloqot qilish uchun polling.
+    # Boshqa foydalanuvchilarning xabarlariga handlers.py ichida javob berilmaydi.
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
