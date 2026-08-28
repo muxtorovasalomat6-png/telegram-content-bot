@@ -9,7 +9,7 @@ from aiogram import Bot
 from aiogram.types import BufferedInputFile
 
 from src import config, state
-from src.content_generator import generate_post, generate_poll, FALLBACK_TOPICS
+from src.content_generator import generate_post, generate_poll, FALLBACK_TOPICS, SUBTOPIC_POOLS
 from src.channel_analyzer import analyze_topics
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,11 @@ POLL_CHANCE = 0.25
 
 def _resolve_topic(channel: config.ChannelConfig) -> str:
     if not channel.auto_topic:
-        return channel.fixed_topic or random.choice(FALLBACK_TOPICS)
+        base_topic = channel.fixed_topic or random.choice(FALLBACK_TOPICS)
+        pool = SUBTOPIC_POOLS.get(base_topic)
+        if pool:
+            return state.pick_subtopic(channel.target, pool)
+        return base_topic
 
     cached = _topic_cache.get(channel.target)
     if cached:
