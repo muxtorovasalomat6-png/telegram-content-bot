@@ -10,7 +10,13 @@ from aiogram import Router, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    Message,
+    CallbackQuery,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    ChatMemberUpdated,
+)
 
 from src import config
 from src import state as bot_state
@@ -90,6 +96,46 @@ def _schedule_text() -> str:
         times = ", ".join(t.strftime("%H:%M") for _, t in items)
         lines.append(f"• {target}: {times}")
     return "\n".join(lines)
+
+
+@router.my_chat_member()
+async def on_bot_membership_changed(update: ChatMemberUpdated):
+    """
+    Bot biror kanal/guruhda ADMINISTRATOR qilib tayinlanganda avtomatik
+    ishga tushadi: kanalni ro'yxatga qo'shadi va egaga xabar beradi.
+    """
+    new_status = update.new_chat_member.status
+    old_status = update.old_chat_member.status
+
+    if new_status != "administrator" or old_status == "administrator":
+        return
+
+    chat = update.chat
+    target = f"@{chat.username}" if chat.username else str(chat.id)
+
+    if bot_state.has_channel(target):
+        return
+
+    bot_state.add_channel(
+        config.ChannelConfig(target=target, analyze_source=None, auto_topic=True, fixed_topic=None)
+    )
+    logger.info(f"Yangi kanal avtomatik qo'shildi: {target} ({chat.title})")
+
+    if config.OWNER_ID:
+        try:
+            await update.bot.send_message(
+                chat_id=config.OWNER_ID,
+                text=(
+                    f"✅ Bot yangi kanalga admin qilib tayinlandi va avtomatik ulandi:\n"
+                    f"<b>{chat.title}</b> ({target})\n\n"
+                    f"Bot bu yerda ham kuniga {config.MIN_POSTS_PER_DAY}-{config.MAX_POSTS_PER_DAY} ta post "
+                    f"yubora boshlaydi. Mavzuni o'zi (kanal postlariga qarab) aniqlaydi.\n\n"
+                    f"Kerak bo'lmasa, 📋 Kanallar bo'limidan uzib tashlashingiz mumkin."
+                ),
+                reply_markup=_main_keyboard(),
+            )
+        except Exception:
+            logger.exception("Egaga xabar yuborib bo'lmadi")
 
 
 @router.message(Command("start"))
