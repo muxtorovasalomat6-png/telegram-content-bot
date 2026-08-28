@@ -2,6 +2,7 @@ import random
 import logging
 import uuid
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiogram import Bot
@@ -12,6 +13,12 @@ from src.content_generator import generate_post, generate_poll, FALLBACK_TOPICS
 from src.channel_analyzer import analyze_topics
 
 logger = logging.getLogger(__name__)
+
+TZ = ZoneInfo("Asia/Tashkent")
+
+
+def now_tz() -> datetime:
+    return datetime.now(TZ)
 
 # Har bir kanalning joriy mavzusi shu yerda keshlanadi (kunlik yangilanadi)
 _topic_cache: dict[str, str] = {}
@@ -147,13 +154,13 @@ def _schedule_channel_day(channel: config.ChannelConfig, now: datetime):
 
 
 def _schedule_next_day():
-    tomorrow_start = (datetime.now() + timedelta(days=1)).replace(
+    tomorrow_start = (now_tz() + timedelta(days=1)).replace(
         hour=0, minute=1, second=0, microsecond=0
     )
 
     async def plan_tomorrow():
         for channel in state.get_channels():
-            _schedule_channel_day(channel, datetime.now())
+            _schedule_channel_day(channel, now_tz())
         _schedule_next_day()
 
     _scheduler_ref.add_job(plan_tomorrow, "date", run_date=tomorrow_start)
@@ -163,7 +170,7 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
     global _scheduler_ref, _bot_ref
     _scheduler_ref = AsyncIOScheduler()
     _bot_ref = bot
-    now = datetime.now()
+    now = now_tz()
 
     for channel in state.get_channels():
         _schedule_channel_day(channel, now)
