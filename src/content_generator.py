@@ -3,6 +3,7 @@ Kontent generatori: har bir kanal uchun (aniqlangan yoki qo'lda belgilangan)
 mavzuga mos matn va rasm yaratadi.
 """
 
+import json
 import logging
 
 from google import genai
@@ -25,13 +26,42 @@ FALLBACK_TOPICS = [
     "zamonaviy texnologiyalar",
 ]
 
+# Asosiy mavzu (masalan "kiberxavfsizlik") uchun aniq kichik mavzular (subtopic) ro'yxati.
+# Kalit — asosiy mavzu nomi bilan bir xil bo'lishi shart emas, faqat mos kelishi kerak.
+SUBTOPIC_POOLS: dict[str, list[str]] = {
+    "kiberxavfsizlik": [
+        "Ikki bosqichli tasdiqlash (2FA) nima va nega kerak",
+        "Kuchli parol qanday tuzilishi kerak",
+        "Fishing (aldov xatlar) qanday aniqlanadi",
+        "Ijtimoiy tarmoqlarda shaxsiy ma'lumotlarni himoya qilish",
+        "Ochiq Wi-Fi tarmoqlaridan foydalanish xavfi",
+        "Telefon va kompyuterni zararli dasturlardan himoya qilish",
+        "Bank kartasi ma'lumotlarini internetda himoya qilish",
+        "Bolalar internetda xavfsizligi",
+        "Parol menejerlaridan foydalanish foydalari",
+        "Internetda shaxsni o'g'irlash (identity theft) qanday oldini olish mumkin",
+        "Kiberjinoyatchilik nima va uning turlari",
+        "Internetda javobgarlik: nima yozish mumkin, nima mumkin emas",
+        "Ijtimoiy muhandislik (social engineering) firibgarligi",
+        "Dasturiy ta'minotni yangilab turish nega muhim",
+        "Bolalar va o'smirlar uchun kiberbulling (onlayn tahdid)dan himoya",
+    ],
+}
+
 
 def generate_caption(topic: str) -> str:
     prompt = (
-        f"Sen Telegram kanal uchun kontent yozuvchisan. Bu kanal odatda "
+        f"Sen professional Telegram kanal uchun kontent yozuvchisan. Bu kanal odatda "
         f"quyidagi mavzu(lar)da post qiladi: '{topic}'. "
-        f"Shu mavzu doirasida qisqa, foydali va o'quvchini qiziqtiradigan yangi post yoz. "
-        f"Talablar: o'zbek tilida, 4-8 qator, mos emojilar bilan, oxirida 2-3 ta hashtag. "
+        f"Shu mavzu doirasida chuqurroq, foydali va o'quvchini qiziqtiradigan yangi post yoz. "
+        f"Talablar:\n"
+        f"- O'zbek tilida\n"
+        f"- Kamida 8-12 qator (juda qisqa bo'lmasin, mavzuni yetarlicha ochib ber)\n"
+        f"- Jozibali sarlavha bilan boshlansin (masalan qalin matn yoki emoji bilan)\n"
+        f"- 2-4 ta aniq maslahat yoki fakt keltir (ro'yxat yoki alohida qatorlar bilan)\n"
+        f"- Mos joylarda emojilar ishlat\n"
+        f"- Oxirida qisqa xulosa yoki chaqiriq (call-to-action) yoz\n"
+        f"- Eng oxirida 2-3 ta tegishli hashtag qo'y\n"
         f"Faqat post matnini qaytar, boshqa izoh yozma."
     )
     response = client.models.generate_content(model=TEXT_MODEL, contents=prompt)
@@ -56,9 +86,6 @@ def generate_image(topic: str) -> bytes | None:
     except Exception:
         logger.exception("Rasm generatsiyasida xatolik yuz berdi")
     return None
-
-
-import json
 
 
 def generate_poll(topic: str) -> dict | None:
