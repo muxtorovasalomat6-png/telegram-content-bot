@@ -14,7 +14,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 
 from src import config
 from src import state as bot_state
-from src.scheduler import get_today_schedule, cancel_job, cancel_all_for_channel, schedule_one
+from src.scheduler import get_today_schedule, cancel_job, cancel_all_for_channel, schedule_one, now_tz
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +231,7 @@ async def msg_add_time_value(message: Message, state: FSMContext):
     data = await state.get_data()
     target = data["target"]
 
-    now = datetime.now()
+    now = now_tz()
     run_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if run_time <= now:
         run_time += timedelta(days=1)
