@@ -40,6 +40,16 @@ def remove_channel(target: str):
     _channels = [c for c in _channels if c.target != target]
 
 
+def add_channel(channel: config.ChannelConfig):
+    global _channels
+    if not any(c.target == channel.target for c in _channels):
+        _channels = _channels + [channel]
+
+
+def has_channel(target: str) -> bool:
+    return any(c.target == target for c in _channels)
+
+
 def pick_subtopic(target: str, pool: list[str]) -> str:
     """
     Berilgan pool (kichik mavzular ro'yxati)dan, oxirgi ishlatilganlarni
