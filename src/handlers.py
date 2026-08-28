@@ -12,7 +12,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
-from src import config, state
+from src import config
+from src import state as bot_state
 from src.scheduler import get_today_schedule, cancel_job, cancel_all_for_channel, schedule_one
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ def _owner_only(user_id: int) -> bool:
 
 
 def _main_keyboard() -> InlineKeyboardMarkup:
-    if state.is_running():
+    if bot_state.is_running():
         toggle_btn = InlineKeyboardButton(text="⏸ To'xtatish", callback_data="bot_stop")
     else:
         toggle_btn = InlineKeyboardButton(text="▶️ Ishga tushirish", callback_data="bot_start")
@@ -46,8 +47,8 @@ def _main_keyboard() -> InlineKeyboardMarkup:
 
 
 def _status_text() -> str:
-    holat = "🟢 Ishlayapti" if state.is_running() else "🔴 To'xtatilgan"
-    kanallar = "\n".join(f"• {c.target}" for c in state.get_channels()) or "— hech qanday kanal yo'q —"
+    holat = "🟢 Ishlayapti" if bot_state.is_running() else "🔴 To'xtatilgan"
+    kanallar = "\n".join(f"• {c.target}" for c in bot_state.get_channels()) or "— hech qanday kanal yo'q —"
     return (
         f"<b>Bot holati:</b> {holat}\n\n"
         f"<b>Ulangan kanallar:</b>\n{kanallar}\n\n"
@@ -58,7 +59,7 @@ def _status_text() -> str:
 
 def _channels_keyboard() -> InlineKeyboardMarkup:
     rows = []
-    for c in state.get_channels():
+    for c in bot_state.get_channels():
         rows.append([InlineKeyboardButton(text=f"❌ {c.target}", callback_data=f"rmchan:{c.target}")])
     rows.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="back_main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -92,7 +93,7 @@ def _schedule_text() -> str:
 
 
 @router.message(Command("start"))
-async def cmd_start(message: Message, state_ctx: FSMContext = None):
+async def cmd_start(message: Message):
     if not _owner_only(message.from_user.id):
         return
     await message.answer(_status_text(), reply_markup=_main_keyboard())
@@ -110,7 +111,7 @@ async def cb_back_main(callback: CallbackQuery):
 async def cb_stop(callback: CallbackQuery):
     if not _owner_only(callback.from_user.id):
         return
-    state.stop()
+    bot_state.stop()
     await callback.message.edit_text(_status_text(), reply_markup=_main_keyboard())
     await callback.answer("Bot to'xtatildi")
 
@@ -119,7 +120,7 @@ async def cb_stop(callback: CallbackQuery):
 async def cb_start(callback: CallbackQuery):
     if not _owner_only(callback.from_user.id):
         return
-    state.start()
+    bot_state.start()
     await callback.message.edit_text(_status_text(), reply_markup=_main_keyboard())
     await callback.answer("Bot ishga tushirildi")
 
@@ -148,7 +149,7 @@ async def cb_remove_channel(callback: CallbackQuery):
     if not _owner_only(callback.from_user.id):
         return
     target = callback.data.split(":", 1)[1]
-    state.remove_channel(target)
+    bot_state.remove_channel(target)
     cancel_all_for_channel(target)
     await callback.message.edit_text(
         f"✅ {target} kanali uzib tashlandi.\n\n<b>Ulangan kanallar</b>",
@@ -176,16 +177,16 @@ async def cb_remove_time(callback: CallbackQuery):
 
 
 @router.callback_query(F.data == "addtime")
-async def cb_add_time_start(callback: CallbackQuery, state_ctx: FSMContext):
+async def cb_add_time_start(callback: CallbackQuery, state: FSMContext):
     if not _owner_only(callback.from_user.id):
         return
-    channels = state.get_channels()
+    channels = bot_state.get_channels()
     if not channels:
         await callback.answer("Hech qanday kanal yo'q", show_alert=True)
         return
     if len(channels) == 1:
-        await state_ctx.update_data(target=channels[0].target)
-        await state_ctx.set_state(AddTime.waiting_for_time)
+        await state.update_data(target=channels[0].target)
+        await state.set_state(AddTime.waiting_for_time)
         await callback.message.edit_text(
             f"{channels[0].target} uchun vaqtni HH:MM ko'rinishida yozing (masalan 18:30):"
         )
@@ -196,7 +197,7 @@ async def cb_add_time_start(callback: CallbackQuery, state_ctx: FSMContext):
         [InlineKeyboardButton(text=c.target, callback_data=f"addtime_chan:{c.target}")]
         for c in channels
     ]
-    await state_ctx.set_state(AddTime.waiting_for_channel)
+    await state.set_state(AddTime.waiting_for_channel)
     await callback.message.edit_text(
         "Qaysi kanal uchun vaqt qo'shamiz?", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows)
     )
@@ -204,18 +205,18 @@ async def cb_add_time_start(callback: CallbackQuery, state_ctx: FSMContext):
 
 
 @router.callback_query(F.data.startswith("addtime_chan:"), StateFilter(AddTime.waiting_for_channel))
-async def cb_add_time_channel_chosen(callback: CallbackQuery, state_ctx: FSMContext):
+async def cb_add_time_channel_chosen(callback: CallbackQuery, state: FSMContext):
     if not _owner_only(callback.from_user.id):
         return
     target = callback.data.split(":", 1)[1]
-    await state_ctx.update_data(target=target)
-    await state_ctx.set_state(AddTime.waiting_for_time)
+    await state.update_data(target=target)
+    await state.set_state(AddTime.waiting_for_time)
     await callback.message.edit_text(f"{target} uchun vaqtni HH:MM ko'rinishida yozing (masalan 18:30):")
     await callback.answer()
 
 
 @router.message(StateFilter(AddTime.waiting_for_time))
-async def msg_add_time_value(message: Message, state_ctx: FSMContext):
+async def msg_add_time_value(message: Message, state: FSMContext):
     if not _owner_only(message.from_user.id):
         return
 
@@ -227,7 +228,7 @@ async def msg_add_time_value(message: Message, state_ctx: FSMContext):
         await message.answer("Noto'g'ri format. Iltimos HH:MM ko'rinishida yozing (masalan 09:15).")
         return
 
-    data = await state_ctx.get_data()
+    data = await state.get_data()
     target = data["target"]
 
     now = datetime.now()
@@ -236,7 +237,7 @@ async def msg_add_time_value(message: Message, state_ctx: FSMContext):
         run_time += timedelta(days=1)
 
     schedule_one(target, run_time)
-    await state_ctx.clear()
+    await state.clear()
     await message.answer(
         f"✅ {target} uchun {run_time.strftime('%d.%m %H:%M')} vaqtga post qo'shildi.",
         reply_markup=_main_keyboard(),
